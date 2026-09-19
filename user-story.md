@@ -1,19 +1,36 @@
-Need the ability to create a product in the catalog.
+---
+name: User Story
+about: Create a user story for a feature or requirement
+title: "[USER STORY] "
+labels: "user-story"
+assignees: ""
+---
 
-Need the ability to retrieve a product from the catalog.
+## User Story
 
-Need the ability to update a product in the catalog.
+**As a** [type of user]
 
-Need the ability to delete a product from the catalog.
+**I want** [goal/action]
 
-Need the ability to Like a product in the catalog.
+**So that** [benefit/value]
 
-Need the ability to Dislike a product in the catalog.
+---
 
-Need the ability to list all products in the catalog.
+## Acceptance Criteria
 
-Need the ability to query a subset of products in the catalog.
+- [ ] Given [context], when [action], then [expected result]
+- [ ] Given [context], when [action], then [expected result]
+- [ ] Given [context], when [action], then [expected result]
 
-Must be hosted in the cloud.
+---
 
-Must have automation to deploy new changes to the cloud.
+## Notes
+
+<!-- Add any additional information, business rules, dependencies, or references. -->
+
+## Definition of Done
+
+- [ ] Implementation completed
+- [ ] Tested
+- [ ] Acceptance criteria satisfied
+- [ ] Documentation updated if required
