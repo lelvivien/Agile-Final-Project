@@ -1,0 +1,73 @@
+import io
+import os
+import tempfile
+import unittest
+
+from app import create_app
+
+
+class ProductCatalogTestCase(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.temp_dir.name, "test.db")
+        self.upload_dir = os.path.join(self.temp_dir.name, "uploads")
+        self.app = create_app(
+            {
+                "TESTING": True,
+                "DATABASE": self.db_path,
+                "UPLOAD_FOLDER": self.upload_dir,
+                "SECRET_KEY": "test",
+            }
+        )
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_catalog_form_is_available(self):
+        response = self.client.get("/products/new")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Product image", response.data)
+        self.assertIn(b"Description", response.data)
+        self.assertIn(b"Category", response.data)
+        self.assertIn(b"Price", response.data)
+
+    def test_create_product_displays_it_in_catalog(self):
+        response = self.client.post(
+            "/products/new",
+            data={
+                "description": "Travel Mug",
+                "category": "Accessories",
+                "price": "12.50",
+                "image": (io.BytesIO(b"fake image bytes"), "mug.png"),
+            },
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Travel Mug", response.data)
+        self.assertIn(b"Category: Accessories", response.data)
+        self.assertIn(b"Price: $12.50", response.data)
+        self.assertIn(b"/uploads/", response.data)
+        self.assertTrue(os.listdir(self.upload_dir))
+
+    def test_create_product_requires_image(self):
+        response = self.client.post(
+            "/products/new",
+            data={
+                "description": "Travel Mug",
+                "category": "Accessories",
+                "price": "12.50",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Product image is required.", response.data)
+        self.assertEqual(os.listdir(self.upload_dir), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

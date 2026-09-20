@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Product Catalog</title>
+  </head>
+  <body>
+    <h1>Product Catalog</h1>
+    <p><a href="{{ url_for('create_product') }}">Add Product</a></p>
+    {% if products %}
+      <ul>
+        {% for product in products %}
+          <li>
+            <img src="{{ url_for('uploaded_file', filename=product['image_filename']) }}" alt="{{ product['description'] }}" width="150">
+            <div>{{ product['description'] }}</div>
+            <div>Category: {{ product['category'] }}</div>
+            <div>Price: ${{ product['price'] }}</div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No products in the catalog yet.</p>
+    {% endif %}
+  </body>
+</html>
