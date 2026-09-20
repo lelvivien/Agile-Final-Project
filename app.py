@@ -48,21 +48,33 @@ def create_app(test_config=None):
 
     @app.route("/products/new", methods=["GET", "POST"])
     def create_product():
+        form_data = {"description": "", "category": "", "price": ""}
+        invalid_field = None
+
         if request.method == "POST":
-            description = request.form.get("description", "").strip()
-            category = request.form.get("category", "").strip()
-            price_value = request.form.get("price", "").strip()
+            form_data = {
+                "description": request.form.get("description", "").strip(),
+                "category": request.form.get("category", "").strip(),
+                "price": request.form.get("price", "").strip(),
+            }
+            description = form_data["description"]
+            category = form_data["category"]
+            price_value = form_data["price"]
             image = request.files.get("image")
             error = None
 
             if not description:
                 error = "Description is required."
+                invalid_field = "description"
             elif not category:
                 error = "Category is required."
+                invalid_field = "category"
             elif not price_value:
                 error = "Price is required."
+                invalid_field = "price"
             elif image is None or not image.filename:
                 error = "Product image is required."
+                invalid_field = "image"
             else:
                 try:
                     price = Decimal(price_value)
@@ -70,17 +82,20 @@ def create_app(test_config=None):
                         raise InvalidOperation
                 except InvalidOperation:
                     error = "Price must be a non-negative number."
+                    invalid_field = "price"
 
             if error is None:
                 filename = secure_filename(image.filename)
                 if not filename:
                     error = "Product image filename is invalid."
+                    invalid_field = "image"
                 else:
                     image_bytes = image.stream.read()
                     image.stream.seek(0)
                     detected_type = detect_image_type(image_bytes)
                     if detected_type not in ALLOWED_IMAGE_TYPES:
                         error = "Product image must be a GIF, JPEG, PNG, or WebP file."
+                        invalid_field = "image"
 
             if error is None:
                 name_root = os.path.splitext(filename)[0] or "product-image"
@@ -88,16 +103,15 @@ def create_app(test_config=None):
                     f"{uuid.uuid4().hex}_{name_root}{ALLOWED_IMAGE_TYPES[detected_type]}"
                 )
                 image_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_filename)
-                image.save(image_path)
-
                 db = get_db()
                 try:
+                    image.save(image_path)
                     db.execute(
                         "INSERT INTO products (description, category, price, image_filename) VALUES (?, ?, ?, ?)",
                         (description, category, f"{price:.2f}", unique_filename),
                     )
                     db.commit()
-                except sqlite3.DatabaseError:
+                except (OSError, sqlite3.DatabaseError):
                     if os.path.exists(image_path):
                         os.remove(image_path)
                     raise
@@ -106,7 +120,11 @@ def create_app(test_config=None):
 
             flash(error)
 
-        return render_template("create_product.html")
+        return render_template(
+            "create_product.html",
+            form_data=form_data,
+            invalid_field=invalid_field,
+        )
 
     return app
 
