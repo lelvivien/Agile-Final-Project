@@ -1,9 +1,14 @@
+import base64
 import io
 import os
 import tempfile
 import unittest
 
 from app import create_app
+
+PNG_IMAGE_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5W3n0AAAAASUVORK5CYII="
+)
 
 
 class ProductCatalogTestCase(unittest.TestCase):
@@ -40,7 +45,7 @@ class ProductCatalogTestCase(unittest.TestCase):
                 "description": "Travel Mug",
                 "category": "Accessories",
                 "price": "12.50",
-                "image": (io.BytesIO(b"fake image bytes"), "mug.png"),
+                "image": (io.BytesIO(PNG_IMAGE_BYTES), "mug.png"),
             },
             content_type="multipart/form-data",
             follow_redirects=True,
@@ -66,6 +71,43 @@ class ProductCatalogTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Product image is required.", response.data)
+        self.assertEqual(os.listdir(self.upload_dir), [])
+
+    def test_create_product_rejects_invalid_price(self):
+        response = self.client.post(
+            "/products/new",
+            data={
+                "description": "Travel Mug",
+                "category": "Accessories",
+                "price": "-1.00",
+                "image": (io.BytesIO(PNG_IMAGE_BYTES), "mug.png"),
+            },
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Price must be a non-negative number.", response.data)
+        self.assertEqual(os.listdir(self.upload_dir), [])
+
+    def test_create_product_rejects_non_image_upload(self):
+        response = self.client.post(
+            "/products/new",
+            data={
+                "description": "Travel Mug",
+                "category": "Accessories",
+                "price": "12.50",
+                "image": (io.BytesIO(b"not an image"), "mug.txt"),
+            },
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b"Product image must be a GIF, JPEG, PNG, or WebP file.",
+            response.data,
+        )
         self.assertEqual(os.listdir(self.upload_dir), [])
 
 

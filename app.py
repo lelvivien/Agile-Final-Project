@@ -6,6 +6,13 @@ import uuid
 from flask import Flask, current_app, flash, g, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
+ALLOWED_IMAGE_TYPES = {
+    "gif": ".gif",
+    "jpeg": ".jpg",
+    "png": ".png",
+    "webp": ".webp",
+}
+
 
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -66,17 +73,34 @@ def create_app(test_config=None):
             if error is None:
                 filename = secure_filename(image.filename)
                 if not filename:
-                    flash("Product image filename is invalid.")
-                    return render_template("create_product.html")
-                unique_filename = f"{uuid.uuid4().hex}_{filename}"
-                image.save(os.path.join(app.config["UPLOAD_FOLDER"], unique_filename))
+                    error = "Product image filename is invalid."
+                else:
+                    image_bytes = image.stream.read()
+                    image.stream.seek(0)
+                    detected_type = detect_image_type(image_bytes)
+                    if detected_type not in ALLOWED_IMAGE_TYPES:
+                        error = "Product image must be a GIF, JPEG, PNG, or WebP file."
+
+            if error is None:
+                name_root = os.path.splitext(filename)[0] or "product-image"
+                unique_filename = (
+                    f"{uuid.uuid4().hex}_{name_root}{ALLOWED_IMAGE_TYPES[detected_type]}"
+                )
+                image_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_filename)
+                image.save(image_path)
 
                 db = get_db()
-                db.execute(
-                    "INSERT INTO products (description, category, price, image_filename) VALUES (?, ?, ?, ?)",
-                    (description, category, f"{price:.2f}", unique_filename),
-                )
-                db.commit()
+                try:
+                    db.execute(
+                        "INSERT INTO products (description, category, price, image_filename) VALUES (?, ?, ?, ?)",
+                        (description, category, f"{price:.2f}", unique_filename),
+                    )
+                    db.commit()
+                except sqlite3.DatabaseError:
+                    if os.path.exists(image_path):
+                        os.remove(image_path)
+                    raise
+
                 return redirect(url_for("index"))
 
             flash(error)
@@ -95,6 +119,22 @@ def get_db():
         g.db = sqlite3.connect(current_app.config["DATABASE"])
         g.db.row_factory = sqlite3.Row
     return g.db
+
+
+def detect_image_type(image_bytes):
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if image_bytes.startswith((b"GIF87a", b"GIF89a")):
+        return "gif"
+    if (
+        len(image_bytes) >= 12
+        and image_bytes[:4] == b"RIFF"
+        and image_bytes[8:12] == b"WEBP"
+    ):
+        return "webp"
+    return None
 
 
 def init_db(app):
