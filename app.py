@@ -3,7 +3,7 @@ import os
 import sqlite3
 import uuid
 
-from flask import Flask, current_app, flash, g, redirect, render_template, request, send_from_directory, url_for
+from flask import Flask, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.utils import secure_filename
 
 ALLOWED_IMAGE_TYPES = {
@@ -15,12 +15,13 @@ ALLOWED_IMAGE_TYPES = {
 
 
 def create_app(test_config=None):
-    app = Flask(__name__)
+    static_folder = test_config.get("STATIC_FOLDER") if test_config else None
+    app = Flask(__name__, static_folder=static_folder or "static")
     base_dir = os.path.abspath(os.path.dirname(__file__))
     app.config.from_mapping(
         SECRET_KEY="dev",
         DATABASE=os.path.join(base_dir, "instance", "catalog.db"),
-        UPLOAD_FOLDER=os.path.join(base_dir, "static", "uploads"),
+        UPLOAD_FOLDER=os.path.join(app.static_folder, "uploads"),
     )
 
     if test_config:
@@ -106,10 +107,6 @@ def create_app(test_config=None):
             flash(error)
 
         return render_template("create_product.html")
-
-    @app.route("/uploads/<path:filename>")
-    def uploaded_file(filename):
-        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
     return app
 

@@ -15,11 +15,13 @@ class ProductCatalogTestCase(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "test.db")
-        self.upload_dir = os.path.join(self.temp_dir.name, "uploads")
+        self.static_dir = os.path.join(self.temp_dir.name, "static")
+        self.upload_dir = os.path.join(self.static_dir, "uploads")
         self.app = create_app(
             {
                 "TESTING": True,
                 "DATABASE": self.db_path,
+                "STATIC_FOLDER": self.static_dir,
                 "UPLOAD_FOLDER": self.upload_dir,
                 "SECRET_KEY": "test",
             }
@@ -55,7 +57,7 @@ class ProductCatalogTestCase(unittest.TestCase):
         self.assertIn(b"Travel Mug", response.data)
         self.assertIn(b"Category: Accessories", response.data)
         self.assertIn(b"Price: $12.50", response.data)
-        self.assertIn(b"/uploads/", response.data)
+        self.assertIn(b"/static/uploads/", response.data)
         self.assertTrue(os.listdir(self.upload_dir))
 
     def test_create_product_requires_image(self):
@@ -80,6 +82,23 @@ class ProductCatalogTestCase(unittest.TestCase):
                 "description": "Travel Mug",
                 "category": "Accessories",
                 "price": "-1.00",
+                "image": (io.BytesIO(PNG_IMAGE_BYTES), "mug.png"),
+            },
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Price must be a non-negative number.", response.data)
+        self.assertEqual(os.listdir(self.upload_dir), [])
+
+    def test_create_product_rejects_non_finite_price(self):
+        response = self.client.post(
+            "/products/new",
+            data={
+                "description": "Travel Mug",
+                "category": "Accessories",
+                "price": "NaN",
                 "image": (io.BytesIO(PNG_IMAGE_BYTES), "mug.png"),
             },
             content_type="multipart/form-data",
